@@ -21,7 +21,7 @@ const Layout: React.FC<{
     logout();
     navigate('/');
   };
-  return <div className="min-h-screen bg-gray-50">
+  return <div className="min-h-screen bg-gray-50 flex flex-col" >
       {/* Header */}
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -148,7 +148,7 @@ const Layout: React.FC<{
           </div>}
       </header>
       {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow content-center w-full">
         {children}
       </main>
       {/* Footer */}
