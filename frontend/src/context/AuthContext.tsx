@@ -63,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return {
         id: payload.sub,
         email: payload.email,
-        role: payload.role,
+        role: payload.rol,
         name,
       };
     } catch {
@@ -89,7 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     setError(null);
     try {
-      const { token: newToken } = await callApi('http://localhost:8080/auth/SignIn', { email, contrasenia: password });
+      const { token: newToken } = await callApi('http://localhost/auth/SignIn', { email, contrasenia: password });
       const decoded = decodeToken(newToken);
       setToken(newToken);
       setUser(decoded);
@@ -111,7 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const payload = { ...data, rol: 'user' };
 
     
-    const res = await fetch('http://localhost:8080/users', {
+    const res = await fetch('http://localhost/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       mode: 'cors',
@@ -149,6 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setToken(null);
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('notifications');
   };
 
   return (

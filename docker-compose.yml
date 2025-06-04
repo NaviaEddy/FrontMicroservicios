@@ -1,0 +1,205 @@
+services:
+  # Base de datos PostgreSQL - users
+  postgres:
+    image: postgres:16.4
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 
+      POSTGRES_DB: db_ventas_users
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    restart: always
+    networks:
+      - app-network
+
+  # Base de datos PostgreSQL - events
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_DB=eventos_db
+      - POSTGRES_USER=eventos_user
+      - POSTGRES_PASSWORD=eventos_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eventos_user -d eventos_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # Base de datos MongoDB - purchases
+  mongodb:
+    image: mongo:7.0-jammy
+    container_name: eventos_mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_URI: mongodb://admin:password123@mongodb:27017/eventos_db
+      MONGO_DB_NAME: eventos_db
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8081
+      RUST_LOG: info
+      LlaveJWT: SDKJDHFDasdss1238/95222sdsdsd-885sd9*
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASS: guest
+      RABBITMQ_QUEUE: notifications_queue
+    volumes:
+      - mongodb_data:/data/db
+      - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    networks:
+      - app-network
+
+  # RabbitMQ
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: eventos_rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"     # Puerto AMQP
+      - "15672:15672"   # Puerto management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - app-network
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  rust-app:
+    image: sebastiandll/rust_eventos_app:v8.0
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      MONGO_URI: mongodb://mongodb:27017/eventos_db
+      MONGO_DB_NAME: eventos_db
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8081
+      RUST_LOG: info
+      LlaveJWT: DKJDHFDasdss1238/95222sdsdsd-*885sd9**
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASS: guest
+      RABBITMQ_QUEUE: notifications_queue
+    depends_on:
+      mongodb:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  notifications:
+    image: ricard010/servicio-notificaciones:2.3
+    container_name: eventos_notifications
+    restart: unless-stopped
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
+      RABBITMQ_QUEUE: notifications_queue
+      MAIL_MAILER: smtp
+      MAIL_HOST: smtp.gmail.com
+      MAIL_PORT: 587
+      MAIL_USERNAME: diazbarronricardojairo2@gmail.com
+      MAIL_PASSWORD: hzbsbtwnuwixnypt
+      MAIL_ENCRYPTION: tls
+      MAIL_FROM_ADDRESS: diazbarronricardojairo2@gmail.com
+      MAIL_FROM_NAME: "Notificaciones Eventos"
+      APP_ENV: production
+      LOG_CHANNEL: stderr
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - app-network
+    volumes:
+      - ./storage/logs:/var/www/storage/logs  
+  
+  events:
+    image: jason7217/microservicios_eventos:v1.4
+    ports:
+      - "8000:8000"
+    environment:
+      - JWT_SECRET_KEY=DKJDHFDasdss1238/95222sdsdsd-*885sd9**
+      - DEBUG=1
+      - DJANGO_SETTINGS_MODULE=eventos_service.settings
+      - POSTGRES_DB=eventos_db
+      - POSTGRES_USER=eventos_user
+      - POSTGRES_PASSWORD=eventos_password
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  users:
+    image: vseddocker/users_microservicios:v1.4
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    restart: always
+    networks:
+      - app-network
+
+  front:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: front_app
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./Frontend:/app
+      - /app/node_modules 
+    networks:
+      - app-network
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx_proxy
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - users
+      - events
+      - rust-app
+      - notifications
+      - front
+    networks:
+      - app-network
+
+volumes:
+  mongodb_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  pg-data:
+    driver: local
+  postgres_data: 
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge
