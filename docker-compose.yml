@@ -132,7 +132,7 @@ services:
       - ./storage/logs:/var/www/storage/logs  
   
   events:
-    image: jason7217/microservicios_eventos:v1.4
+    image: jason7217/microservicios_eventos:v1.5
     ports:
       - "8000:8000"
     environment:
